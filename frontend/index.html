@@ -114,6 +114,11 @@
                                     <i class="fas fa-chart-line me-2"></i>Pools
                                 </button>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="mev-protection-tab" data-bs-toggle="tab" data-bs-target="#mev-protection" type="button" role="tab">
+                                    <i class="fas fa-shield-alt me-2"></i>MEV Protection
+                                </button>
+                            </li>
                         </ul>
 
                         <div class="tab-content" id="swapTabsContent">
@@ -147,6 +152,26 @@
                                         </select>
                                     </div>
                                     <small class="text-muted">Balance: <span id="toBalance">0.0</span></small>
+                                </div>
+
+                                <!-- MEV Protection Status -->
+                                <div class="mt-3 p-3 bg-light rounded">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <i class="fas fa-shield-alt text-success me-2"></i>
+                                            <span class="fw-bold">MEV Protection Active</span>
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted d-block">Protection Level</small>
+                                            <span class="badge bg-success" id="mevProtectionLevel">High</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            Protection expires in: <span id="protectionExpiry">--</span> blocks
+                                        </small>
+                                    </div>
                                 </div>
 
                                 <div class="d-grid gap-2 mt-4">
@@ -247,6 +272,119 @@
                     </div>
                 </div>
             </div>
+
+            <!-- MEV Protection Tab -->
+            <div class="tab-pane fade" id="mev-protection" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-shield-alt me-2"></i>Protection Status
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Anti-Front-Running Protection</label>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span id="frontRunningStatus" class="badge bg-success">Active</span>
+                                        <small class="text-muted" id="frontRunningBlocks">100 blocks remaining</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Anti-MEV Mode</label>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span id="antiMEVStatus" class="badge bg-warning">Standby</span>
+                                        <small class="text-muted">Activates after protection period</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Transaction Limits</label>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span id="txLimitStatus" class="badge bg-info">1% max per trade</span>
+                                        <small class="text-muted">Prevents monopolization</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-cog me-2"></i>Configuration
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Protection Duration (blocks)</label>
+                                    <input type="number" class="form-control" id="protectionDuration" value="100" min="50" max="500">
+                                    <small class="text-muted">Range: 50-500 blocks</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">MEV Fee (%)</label>
+                                    <input type="number" class="form-control" id="mevFee" value="1.0" min="0.1" max="5.0" step="0.1">
+                                    <small class="text-muted">Range: 0.1-5.0%</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Min Transaction Size (%)</label>
+                                    <input type="number" class="form-control" id="minTxSize" value="0.5" min="0.1" max="2.0" step="0.1">
+                                    <small class="text-muted">Range: 0.1-2.0%</small>
+                                </div>
+                                
+                                <button class="btn btn-primary w-100" onclick="updateMEVConfig()" id="updateConfigBtn">
+                                    <i class="fas fa-save me-2"></i>Update Configuration
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-bar me-2"></i>Protection Analytics
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <div class="stats-card">
+                                            <h3 id="blockedTransactions">0</h3>
+                                            <p>Blocked Transactions</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stats-card">
+                                            <h3 id="protectionEfficiency">99.9%</h3>
+                                            <p>Protection Efficiency</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stats-card">
+                                            <h3 id="avgGasSaved">0.015</h3>
+                                            <p>Avg Gas Saved (ETH)</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stats-card">
+                                            <h3 id="lastAttack">Never</h3>
+                                            <p>Last Attack Attempt</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -255,6 +393,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

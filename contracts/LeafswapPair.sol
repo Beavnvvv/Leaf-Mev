@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/Math.sol";
 import "./libraries/UQ112x112.sol";
+import "./interfaces/Mev/IMEVGuard.sol";
 
 contract LeafswapPair is LeafswapERC20 {
     using SafeMath for uint256;
@@ -125,6 +126,26 @@ contract LeafswapPair is LeafswapERC20 {
         require(amount0Out > 0 || amount1Out > 0, "Leafswap: INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "Leafswap: INSUFFICIENT_LIQUIDITY");
+        
+        // MEV保护：检查是否在保护期内
+        address mevGuard = ILeafswapFactory(factory).MEVGuard();
+        if (mevGuard != address(0)) {
+            // 判断是否启用Anti-MEV模式（在保护期结束后启用）
+            bool antiMEV = block.number >= IMEVGuard(mevGuard).antiFrontDefendBlockEdges(address(this));
+            
+            // 调用MEVGuard进行防护检查
+            bool allowed = IMEVGuard(mevGuard).defend(
+                antiMEV,
+                _reserve0,
+                _reserve1,
+                amount0Out,
+                amount1Out
+            );
+            
+            if (!allowed) {
+                revert("MEVGuard: Transaction blocked");
+            }
+        }
 
         uint256 balance0;
         uint256 balance1;

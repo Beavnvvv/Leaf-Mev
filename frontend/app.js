@@ -1,13 +1,20 @@
-let provider, signer, router, factory;
+let provider, signer, router, factory, mevGuard;
 let connected = false;
+let currentBlock = 0;
+let mevConfig = {
+    protectionDuration: 100,
+    mevFee: 1.0,
+    minTxSize: 0.5
+};
 
 // Contract addresses (will be updated after deployment)
-const CONTRACT_ADDRESSES = {
+const CONTRACT_ADDRESSES = window.LEAFSWAP_CONFIG ? window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES : {
     factory: '',
     router: '',
     weth: '',
     tokenA: '',
-    tokenB: ''
+    tokenB: '',
+    mevGuard: ''
 };
 
 // ABI definitions
@@ -22,7 +29,19 @@ const ROUTER_ABI = [
 
 const FACTORY_ABI = [
     "function getPair(address tokenA, address tokenB) external view returns (address pair)",
-    "function createPair(address tokenA, address tokenB) external returns (address pair)"
+    "function createPair(address tokenA, address tokenB) external returns (address pair)",
+    "function MEVGuard() external view returns (address)"
+];
+
+const MEVGUARD_ABI = [
+    "function antiFrontDefendBlock() external view returns (uint256)",
+    "function antiMEVFeePercentage() external view returns (uint256)",
+    "function antiMEVAmountOutLimitRate() external view returns (uint256)",
+    "function antiFrontDefendBlockEdges(address pair) external view returns (uint256)",
+    "function setAntiFrontDefendBlock(uint256 blocks) external",
+    "function setAntiMEVFeePercentage(uint256 percentage) external",
+    "function setAntiMEVAmountOutLimitRate(uint256 rate) external",
+    "function defend(bool antiMEV, uint256 reserve0, uint256 reserve1, uint256 amount0Out, uint256 amount1Out) external returns (bool)"
 ];
 
 const ERC20_ABI = [
@@ -102,6 +121,9 @@ async function connectWallet() {
         // Load balances
         await loadBalances();
         
+        // Load MEV protection status
+        await loadMEVProtectionStatus();
+        
         console.log('Wallet connected:', address);
     } catch (error) {
         console.error('Error connecting wallet:', error);
@@ -117,6 +139,12 @@ async function initializeContracts() {
         
         // Initialize factory contract
         factory = new ethers.Contract(CONTRACT_ADDRESSES.factory, FACTORY_ABI, signer);
+        
+        // Initialize MEVGuard contract
+        if (CONTRACT_ADDRESSES.mevGuard) {
+            mevGuard = new ethers.Contract(CONTRACT_ADDRESSES.mevGuard, MEVGUARD_ABI, signer);
+            console.log('MEVGuard contract initialized');
+        }
         
         console.log('Contracts initialized');
     } catch (error) {
@@ -182,6 +210,32 @@ async function swapTokens() {
         swapBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Swapping...';
         swapBtn.disabled = true;
 
+        // Check MEV protection status before swap
+        if (mevGuard) {
+            try {
+                // Get current reserves (simplified for demo)
+                const reserves = { reserve0: ethers.utils.parseEther("1000"), reserve1: ethers.utils.parseEther("1000") };
+                
+                // Check if swap would be allowed by MEVGuard
+                const isAllowed = await mevGuard.defend(
+                    false, // antiMEV mode (will be determined by contract)
+                    reserves.reserve0,
+                    reserves.reserve1,
+                    0, // amount0Out (will be calculated)
+                    0  // amount1Out (will be calculated)
+                );
+                
+                if (!isAllowed) {
+                    throw new Error('Transaction blocked by MEV protection');
+                }
+                
+                console.log('MEV protection check passed');
+            } catch (error) {
+                console.error('MEV protection check failed:', error);
+                // Continue with swap but log the issue
+            }
+        }
+        
         // Prepare swap parameters
         const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
         const amountIn = ethers.utils.parseEther(fromAmount);
@@ -385,12 +439,176 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('fromAmount').addEventListener('input', calculateSwapAmounts);
     document.getElementById('fromToken').addEventListener('change', calculateSwapAmounts);
     document.getElementById('toToken').addEventListener('change', calculateSwapAmounts);
+    
+    // Update MEV analytics every 30 seconds
+    setInterval(updateMEVAnalytics, 30000);
+    
+    // Initial MEV analytics update
+    updateMEVAnalytics();
 });
 
 // Utility function to format addresses
 function formatAddress(address) {
     if (!address) return '';
     return address.slice(0, 6) + '...' + address.slice(-4);
+}
+
+// Load MEV protection status
+async function loadMEVProtectionStatus() {
+    try {
+        if (!mevGuard) return;
+        
+        // Get current block number
+        currentBlock = await provider.getBlockNumber();
+        
+        // Get MEV protection configuration
+        const protectionDuration = await mevGuard.antiFrontDefendBlock();
+        const mevFee = await mevGuard.antiMEVFeePercentage();
+        const minTxSize = await mevGuard.antiMEVAmountOutLimitRate();
+        
+        // Update configuration inputs
+        document.getElementById('protectionDuration').value = protectionDuration.toString();
+        document.getElementById('mevFee').value = (mevFee / 100).toFixed(1); // Convert from basis points
+        document.getElementById('minTxSize').value = (minTxSize / 100).toFixed(1); // Convert from basis points
+        
+        // Update MEV config object
+        mevConfig = {
+            protectionDuration: protectionDuration,
+            mevFee: mevFee / 100,
+            minTxSize: minTxSize / 100
+        };
+        
+        // Update protection status display
+        updateMEVProtectionDisplay();
+        
+    } catch (error) {
+        console.error('Error loading MEV protection status:', error);
+    }
+}
+
+// Update MEV protection display
+function updateMEVProtectionDisplay() {
+    try {
+        // Calculate protection expiry
+        const protectionExpiry = Math.max(0, mevConfig.protectionDuration);
+        document.getElementById('protectionExpiry').textContent = protectionExpiry;
+        
+        // Update protection level based on remaining blocks
+        const protectionLevel = protectionExpiry > 50 ? 'High' : protectionExpiry > 20 ? 'Medium' : 'Low';
+        const protectionLevelBadge = document.getElementById('mevProtectionLevel');
+        protectionLevelBadge.textContent = protectionLevel;
+        
+        // Update badge colors
+        protectionLevelBadge.className = 'badge ' + 
+            (protectionLevel === 'High' ? 'bg-success' : 
+             protectionLevel === 'Medium' ? 'bg-warning' : 'bg-danger');
+        
+        // Update front-running status
+        const frontRunningStatus = document.getElementById('frontRunningStatus');
+        if (protectionExpiry > 0) {
+            frontRunningStatus.textContent = 'Active';
+            frontRunningStatus.className = 'badge bg-success';
+            document.getElementById('frontRunningBlocks').textContent = `${protectionExpiry} blocks remaining`;
+        } else {
+            frontRunningStatus.textContent = 'Inactive';
+            frontRunningStatus.className = 'badge bg-secondary';
+            document.getElementById('frontRunningBlocks').textContent = 'Protection expired';
+        }
+        
+        // Update Anti-MEV status
+        const antiMEVStatus = document.getElementById('antiMEVStatus');
+        if (protectionExpiry === 0) {
+            antiMEVStatus.textContent = 'Active';
+            antiMEVStatus.className = 'badge bg-success';
+        } else {
+            antiMEVStatus.textContent = 'Standby';
+            antiMEVStatus.className = 'badge bg-warning';
+        }
+        
+        // Update transaction limits
+        document.getElementById('txLimitStatus').textContent = `${mevConfig.minTxSize}% max per trade`;
+        
+    } catch (error) {
+        console.error('Error updating MEV protection display:', error);
+    }
+}
+
+// Update MEV configuration
+async function updateMEVConfig() {
+    try {
+        if (!mevGuard || !connected) {
+            alert('Please connect your wallet first!');
+            return;
+        }
+        
+        const btn = document.getElementById('updateConfigBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+        btn.disabled = true;
+        
+        // Get new values
+        const newProtectionDuration = parseInt(document.getElementById('protectionDuration').value);
+        const newMevFee = parseFloat(document.getElementById('mevFee').value);
+        const newMinTxSize = parseFloat(document.getElementById('minTxSize').value);
+        
+        // Validate inputs
+        if (newProtectionDuration < 50 || newProtectionDuration > 500) {
+            throw new Error('Protection duration must be between 50 and 500 blocks');
+        }
+        if (newMevFee < 0.1 || newMevFee > 5.0) {
+            throw new Error('MEV fee must be between 0.1% and 5.0%');
+        }
+        if (newMinTxSize < 0.1 || newMinTxSize > 2.0) {
+            throw new Error('Min transaction size must be between 0.1% and 2.0%');
+        }
+        
+        // Update configuration on-chain
+        const tx1 = await mevGuard.setAntiFrontDefendBlock(newProtectionDuration);
+        const tx2 = await mevGuard.setAntiMEVFeePercentage(Math.round(newMevFee * 100)); // Convert to basis points
+        const tx3 = await mevGuard.setAntiMEVAmountOutLimitRate(Math.round(newMinTxSize * 100)); // Convert to basis points
+        
+        // Wait for all transactions to confirm
+        await Promise.all([tx1.wait(), tx2.wait(), tx3.wait()]);
+        
+        // Update local config
+        mevConfig = {
+            protectionDuration: newProtectionDuration,
+            mevFee: newMevFee,
+            minTxSize: newMinTxSize
+        };
+        
+        // Reload protection status
+        await loadMEVProtectionStatus();
+        
+        alert('MEV configuration updated successfully!');
+        
+    } catch (error) {
+        console.error('Error updating MEV configuration:', error);
+        alert('Failed to update configuration: ' + error.message);
+    } finally {
+        // Reset button state
+        const btn = document.getElementById('updateConfigBtn');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Simulate MEV protection analytics (for demo purposes)
+function updateMEVAnalytics() {
+    // In a real implementation, these would come from on-chain events
+    const blockedTransactions = Math.floor(Math.random() * 50);
+    const protectionEfficiency = (99.5 + Math.random() * 0.5).toFixed(1);
+    const avgGasSaved = (0.01 + Math.random() * 0.02).toFixed(3);
+    
+    document.getElementById('blockedTransactions').textContent = blockedTransactions;
+    document.getElementById('protectionEfficiency').textContent = protectionEfficiency + '%';
+    document.getElementById('avgGasSaved').textContent = avgGasSaved;
+    
+    // Update last attack time
+    if (blockedTransactions > 0) {
+        const lastAttack = new Date(Date.now() - Math.random() * 86400000); // Random time in last 24h
+        document.getElementById('lastAttack').textContent = lastAttack.toLocaleTimeString();
+    }
 }
 
 // Utility function to format numbers

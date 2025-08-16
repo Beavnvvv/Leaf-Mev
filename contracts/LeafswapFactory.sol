@@ -3,17 +3,20 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/ILeafswapFactory.sol";
 import "./LeafswapPair.sol";
+import "./interfaces/Mev/IMEVGuard.sol";
 
 contract LeafswapFactory is ILeafswapFactory {
     address public feeTo;
     address public feeToSetter;
+    address public MEVGuard;
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 
-    constructor(address _feeToSetter) {
+    constructor(address _feeToSetter, address _mevGuard) {
         feeToSetter = _feeToSetter;
+        MEVGuard = _mevGuard;
     }
 
     function allPairsLength() external view override returns (uint) {
@@ -32,6 +35,13 @@ contract LeafswapFactory is ILeafswapFactory {
             pair := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
         }
         LeafswapPair(pair).initialize(token0, token1);
+        
+        // 设置MEV保护
+        if (MEVGuard != address(0)) {
+            // 通知MEVGuard设置防抢跑区块边界
+            IMEVGuard(MEVGuard).setAntiFrontDefendBlockEdge(pair, block.number);
+        }
+        
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair;
         allPairs.push(pair);
