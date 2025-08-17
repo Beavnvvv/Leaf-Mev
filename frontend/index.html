@@ -83,6 +83,37 @@
             color: #6c757d;
             font-size: 0.9rem;
         }
+        
+        /* MEV Protection Switch Styles */
+        .form-check-input {
+            width: 3rem;
+            height: 1.5rem;
+            margin-top: 0;
+            background-color: #e9ecef;
+            border: 2px solid #dee2e6;
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .form-check-input:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+        
+        .form-check-input:focus {
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+        
+        .form-check-label {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        /* Notification Styles */
+        .alert {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -154,23 +185,54 @@
                                     <small class="text-muted">Balance: <span id="toBalance">0.0</span></small>
                                 </div>
 
-                                <!-- MEV Protection Status -->
+                                <!-- MEV Protection Switch -->
                                 <div class="mt-3 p-3 bg-light rounded">
-                                    <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
                                         <div>
-                                            <i class="fas fa-shield-alt text-success me-2"></i>
-                                            <span class="fw-bold">MEV Protection Active</span>
+                                            <i class="fas fa-shield-alt me-2"></i>
+                                            <span class="fw-bold">MEV Protection</span>
                                         </div>
-                                        <div class="text-end">
-                                            <small class="text-muted d-block">Protection Level</small>
-                                            <span class="badge bg-success" id="mevProtectionLevel">High</span>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="mevProtectionSwitch">
+                                            <label class="form-check-label" for="mevProtectionSwitch">
+                                                <small class="text-muted">Enable Protection</small>
+                                            </label>
                                         </div>
                                     </div>
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            <i class="fas fa-clock me-1"></i>
-                                            Protection expires in: <span id="protectionExpiry">--</span> blocks
-                                        </small>
+                                    
+                                    <!-- MEV Protection Status (shown when enabled) -->
+                                    <div id="mevProtectionStatus" class="d-none">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <div>
+                                                <span class="fw-bold text-success">Protection Active</span>
+                                            </div>
+                                            <div class="text-end">
+                                                <small class="text-muted d-block">Protection Level</small>
+                                                <span class="badge bg-success" id="mevProtectionLevel">High</span>
+                                            </div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock me-1"></i>
+                                                Protection expires in: <span id="protectionExpiry">--</span> blocks
+                                            </small>
+                                        </div>
+                                        <div class="mb-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                <span id="mevProtectionInfo">Anti-front-running protection active</span>
+                                            </small>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- MEV Protection Disabled (shown when disabled) -->
+                                    <div id="mevProtectionDisabled" class="d-block">
+                                        <div class="text-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                MEV protection is disabled. Enable to protect against front-running and sandwich attacks.
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
 

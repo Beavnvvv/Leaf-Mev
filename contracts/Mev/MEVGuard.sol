@@ -45,6 +45,9 @@ contract MEVGuard is IMEVGuard, Ownable {
     // 用于保证同一 origin、同一 pair 在同一区块内只能请求一次
     mapping(uint256 blockNum => mapping(address pair => mapping(address origin => bool))) private uniqueRequests;
 
+    // userMEVEnabled：记录每个用户是否启用了MEV保护
+    mapping(address user => bool) public userMEVEnabled;
+
     // 构造函数，初始化合约所有者、antiFrontDefendBlock、antiMEVFeePercentage、antiMEVAmountOutLimitRate
     constructor(
         address _owner,
@@ -213,5 +216,23 @@ contract MEVGuard is IMEVGuard, Ownable {
      */
     function setAntiMEVAmountOutLimitRate(uint256 _antiMEVAmountOutLimitRate) external override onlyOwner {
         antiMEVAmountOutLimitRate = _antiMEVAmountOutLimitRate;
+    }
+
+    /**
+     * @dev 检查用户是否启用了MEV保护
+     * @param user 要检查的用户地址
+     * @return 是否启用了MEV保护
+     */
+    function isUserMEVEnabled(address user) external view override returns (bool) {
+        return userMEVEnabled[user];
+    }
+
+    /**
+     * @dev 设置用户的MEV保护状态
+     * @param user 要设置的用户地址
+     * @param enabled 是否启用MEV保护
+     */
+    function setUserMEVEnabled(address user, bool enabled) external override {
+        userMEVEnabled[user] = enabled;
     }
 }

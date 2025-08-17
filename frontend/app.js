@@ -7,6 +7,9 @@ let mevConfig = {
     minTxSize: 0.5
 };
 
+// MEV protection state
+let mevProtectionEnabled = false;
+
 // Contract addresses (will be updated after deployment)
 const CONTRACT_ADDRESSES = window.LEAFSWAP_CONFIG ? window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES : {
     factory: '',
@@ -41,7 +44,9 @@ const MEVGUARD_ABI = [
     "function setAntiFrontDefendBlock(uint256 blocks) external",
     "function setAntiMEVFeePercentage(uint256 percentage) external",
     "function setAntiMEVAmountOutLimitRate(uint256 rate) external",
-    "function defend(bool antiMEV, uint256 reserve0, uint256 reserve1, uint256 amount0Out, uint256 amount1Out) external returns (bool)"
+    "function defend(bool antiMEV, uint256 reserve0, uint256 reserve1, uint256 amount0Out, uint256 amount1Out) external returns (bool)",
+    "function isUserMEVEnabled(address user) external view returns (bool)",
+    "function setUserMEVEnabled(address user, bool enabled) external"
 ];
 
 const ERC20_ABI = [
@@ -123,6 +128,12 @@ async function connectWallet() {
         
         // Load MEV protection status
         await loadMEVProtectionStatus();
+        
+        // Load user's MEV protection status from chain
+        await loadUserMEVProtectionStatus();
+        
+        // Initialize MEV protection switch
+        initializeMEVProtectionSwitch();
         
         console.log('Wallet connected:', address);
     } catch (error) {
@@ -210,8 +221,8 @@ async function swapTokens() {
         swapBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Swapping...';
         swapBtn.disabled = true;
 
-        // Check MEV protection status before swap
-        if (mevGuard) {
+        // Check MEV protection status before swap (only if enabled)
+        if (mevGuard && mevProtectionEnabled) {
             try {
                 // Get current reserves (simplified for demo)
                 const reserves = { reserve0: ethers.utils.parseEther("1000"), reserve1: ethers.utils.parseEther("1000") };
@@ -234,6 +245,10 @@ async function swapTokens() {
                 console.error('MEV protection check failed:', error);
                 // Continue with swap but log the issue
             }
+        } else if (mevProtectionEnabled) {
+            console.log('MEV protection enabled but MEVGuard not available');
+        } else {
+            console.log('MEV protection disabled - proceeding with normal swap');
         }
         
         // Prepare swap parameters
@@ -440,6 +455,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('fromToken').addEventListener('change', calculateSwapAmounts);
     document.getElementById('toToken').addEventListener('change', calculateSwapAmounts);
     
+    // Initialize MEV protection switch (even if wallet not connected)
+    initializeMEVProtectionSwitch();
+    
     // Update MEV analytics every 30 seconds
     setInterval(updateMEVAnalytics, 30000);
     
@@ -489,6 +507,11 @@ async function loadMEVProtectionStatus() {
 // Update MEV protection display
 function updateMEVProtectionDisplay() {
     try {
+        // Only update if MEV protection is enabled
+        if (!mevProtectionEnabled) {
+            return;
+        }
+        
         // Calculate protection expiry
         const protectionExpiry = Math.max(0, mevConfig.protectionDuration);
         document.getElementById('protectionExpiry').textContent = protectionExpiry;
@@ -527,6 +550,9 @@ function updateMEVProtectionDisplay() {
         
         // Update transaction limits
         document.getElementById('txLimitStatus').textContent = `${mevConfig.minTxSize}% max per trade`;
+        
+        // Update protection info
+        updateMEVProtectionInfo();
         
     } catch (error) {
         console.error('Error updating MEV protection display:', error);
@@ -591,6 +617,141 @@ async function updateMEVConfig() {
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+}
+
+// Initialize MEV protection switch
+function initializeMEVProtectionSwitch() {
+    const mevSwitch = document.getElementById('mevProtectionSwitch');
+    const mevStatus = document.getElementById('mevProtectionStatus');
+    const mevDisabled = document.getElementById('mevProtectionDisabled');
+    
+    // Load saved state from localStorage
+    const savedState = localStorage.getItem('mevProtectionEnabled');
+    mevProtectionEnabled = savedState === 'true';
+    mevSwitch.checked = mevProtectionEnabled;
+    
+    // Update UI based on current state
+    updateMEVProtectionUI();
+    
+    // Add event listener for switch toggle
+    mevSwitch.addEventListener('change', function() {
+        mevProtectionEnabled = this.checked;
+        localStorage.setItem('mevProtectionEnabled', mevProtectionEnabled.toString());
+        updateMEVProtectionUI();
+        
+        // Update user's MEV protection status on-chain
+        updateUserMEVProtectionStatus(mevProtectionEnabled);
+        
+        // Show feedback to user
+        if (mevProtectionEnabled) {
+            showNotification('MEV protection enabled', 'success');
+        } else {
+            showNotification('MEV protection disabled', 'info');
+        }
+    });
+}
+
+// Update MEV protection UI based on enabled state
+function updateMEVProtectionUI() {
+    const mevStatus = document.getElementById('mevProtectionStatus');
+    const mevDisabled = document.getElementById('mevProtectionDisabled');
+    
+    if (mevProtectionEnabled) {
+        mevStatus.classList.remove('d-none');
+        mevStatus.classList.add('d-block');
+        mevDisabled.classList.remove('d-block');
+        mevDisabled.classList.add('d-none');
+        
+        // Update protection info based on current state
+        updateMEVProtectionInfo();
+    } else {
+        mevStatus.classList.remove('d-block');
+        mevStatus.classList.add('d-none');
+        mevDisabled.classList.remove('d-none');
+        mevDisabled.classList.add('d-block');
+    }
+}
+
+// Update MEV protection information
+function updateMEVProtectionInfo() {
+    const protectionInfo = document.getElementById('mevProtectionInfo');
+    
+    if (mevConfig.protectionDuration > 0) {
+        protectionInfo.textContent = 'Anti-front-running protection active';
+    } else {
+        protectionInfo.textContent = 'Anti-MEV mode active';
+    }
+}
+
+// Update user's MEV protection status on-chain
+async function updateUserMEVProtectionStatus(enabled) {
+    try {
+        if (!mevGuard || !connected) {
+            console.log('MEVGuard not available or wallet not connected');
+            return;
+        }
+        
+        const userAddress = await signer.getAddress();
+        
+        // Update user's MEV protection status on-chain
+        const tx = await mevGuard.setUserMEVEnabled(userAddress, enabled);
+        await tx.wait();
+        
+        console.log(`User MEV protection ${enabled ? 'enabled' : 'disabled'} on-chain`);
+        
+    } catch (error) {
+        console.error('Error updating user MEV protection status:', error);
+        // Don't show error to user as this is not critical
+    }
+}
+
+// Load user's MEV protection status from chain
+async function loadUserMEVProtectionStatus() {
+    try {
+        if (!mevGuard || !connected) {
+            return;
+        }
+        
+        const userAddress = await signer.getAddress();
+        const onChainStatus = await mevGuard.isUserMEVEnabled(userAddress);
+        
+        // Update local state to match on-chain state
+        mevProtectionEnabled = onChainStatus;
+        
+        // Update UI
+        const mevSwitch = document.getElementById('mevProtectionSwitch');
+        if (mevSwitch) {
+            mevSwitch.checked = mevProtectionEnabled;
+            updateMEVProtectionUI();
+        }
+        
+        console.log(`Loaded user MEV protection status: ${onChainStatus}`);
+        
+    } catch (error) {
+        console.error('Error loading user MEV protection status:', error);
+    }
+}
+
+// Show notification to user
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
 }
 
 // Simulate MEV protection analytics (for demo purposes)

@@ -127,23 +127,28 @@ contract LeafswapPair is LeafswapERC20 {
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "Leafswap: INSUFFICIENT_LIQUIDITY");
         
-        // MEV保护：检查是否在保护期内
+        // MEV保护：检查是否在保护期内（可选）
         address mevGuard = ILeafswapFactory(factory).MEVGuard();
         if (mevGuard != address(0)) {
-            // 判断是否启用Anti-MEV模式（在保护期结束后启用）
-            bool antiMEV = block.number >= IMEVGuard(mevGuard).antiFrontDefendBlockEdges(address(this));
+            // 检查用户是否启用了MEV保护
+            bool userEnabledMEV = IMEVGuard(mevGuard).isUserMEVEnabled(msg.sender);
             
-            // 调用MEVGuard进行防护检查
-            bool allowed = IMEVGuard(mevGuard).defend(
-                antiMEV,
-                _reserve0,
-                _reserve1,
-                amount0Out,
-                amount1Out
-            );
-            
-            if (!allowed) {
-                revert("MEVGuard: Transaction blocked");
+            if (userEnabledMEV) {
+                // 判断是否启用Anti-MEV模式（在保护期结束后启用）
+                bool antiMEV = block.number >= IMEVGuard(mevGuard).antiFrontDefendBlockEdges(address(this));
+                
+                // 调用MEVGuard进行防护检查
+                bool allowed = IMEVGuard(mevGuard).defend(
+                    antiMEV,
+                    _reserve0,
+                    _reserve1,
+                    amount0Out,
+                    amount1Out
+                );
+                
+                if (!allowed) {
+                    revert("MEVGuard: Transaction blocked");
+                }
             }
         }
 

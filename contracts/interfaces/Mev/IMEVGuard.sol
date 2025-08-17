@@ -75,6 +75,13 @@ interface IMEVGuard {
     /// @notice 设置每笔交易允许的最大 amountOut 限制比率（防止滑点过大）
     function setAntiMEVAmountOutLimitRate(uint256 antiMEVAmountOutLimitRate) external;
 
+    // User MEV protection management
+    /// @notice 检查用户是否启用了MEV保护
+    function isUserMEVEnabled(address user) external view returns (bool);
+    
+    /// @notice 设置用户的MEV保护状态
+    function setUserMEVEnabled(address user, bool enabled) external;
+
     /// @dev 抛出错误：当前区块不允许操作（如过于频繁）
     error BlockLimit();
 
