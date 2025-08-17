@@ -14,22 +14,30 @@
     "node": "hardhat node",
     "clean": "hardhat clean"
   },
-  "keywords": ["defi", "uniswap", "amm", "ethereum", "solidity"],
+  "keywords": [
+    "defi",
+    "uniswap",
+    "amm",
+    "ethereum",
+    "solidity"
+  ],
   "author": "Leafswap Team",
   "license": "MIT",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "@types/chai": "^4.3.5",
+    "@types/mocha": "^10.0.1",
+    "chai": "^4.3.7",
     "ethereum-waffle": "^4.0.10",
     "ethers": "^5.7.2",
     "hardhat": "^2.19.1",
-    "chai": "^4.3.7",
-    "@types/chai": "^4.3.5",
-    "@types/mocha": "^10.0.1",
     "hardhat-gas-reporter": "^1.0.9",
     "solidity-coverage": "^0.8.5"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.3"
+    "@chainlink/contracts": "^1.4.0",
+    "@openzeppelin/contracts": "^4.9.3",
+    "dotenv": "^17.2.1"
   }
 }

@@ -11,7 +11,7 @@ let mevConfig = {
 let mevProtectionEnabled = false;
 
 // Contract addresses (will be updated after deployment)
-const CONTRACT_ADDRESSES = window.LEAFSWAP_CONFIG ? window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES : {
+let CONTRACT_ADDRESSES = {
     factory: '',
     router: '',
     weth: '',
@@ -19,6 +19,16 @@ const CONTRACT_ADDRESSES = window.LEAFSWAP_CONFIG ? window.LEAFSWAP_CONFIG.CONTR
     tokenB: '',
     mevGuard: ''
 };
+
+// Update contract addresses from config if available
+function updateContractAddresses() {
+    if (window.LEAFSWAP_CONFIG && window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES) {
+        CONTRACT_ADDRESSES = window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES;
+        console.log('Contract addresses updated from config:', CONTRACT_ADDRESSES);
+    } else {
+        console.log('Using default contract addresses:', CONTRACT_ADDRESSES);
+    }
+}
 
 // ABI definitions
 const ROUTER_ABI = [
@@ -58,23 +68,40 @@ const ERC20_ABI = [
 
 // Initialize the application
 async function init() {
+    console.log('Initializing application...');
     try {
+        // Update contract addresses from config
+        updateContractAddresses();
+        
+        // Check if ethers is available
+        if (typeof ethers === 'undefined') {
+            console.error('Ethers.js not loaded!');
+            alert('Ethers.js library not loaded. Please refresh the page.');
+            return;
+        }
+        console.log('Ethers.js loaded successfully');
+
         // Check if MetaMask is installed
         if (typeof window.ethereum !== 'undefined') {
+            console.log('MetaMask detected');
             provider = new ethers.providers.Web3Provider(window.ethereum);
+            console.log('Provider created:', provider);
             
             // Listen for account changes
             window.ethereum.on('accountsChanged', function (accounts) {
+                console.log('Account changed:', accounts);
                 window.location.reload();
             });
 
             // Listen for chain changes
             window.ethereum.on('chainChanged', function (chainId) {
+                console.log('Chain changed:', chainId);
                 window.location.reload();
             });
 
-            console.log('MetaMask is installed!');
+            console.log('MetaMask is installed and configured!');
         } else {
+            console.error('MetaMask not detected');
             alert('Please install MetaMask to use Leafswap!');
             return;
         }
@@ -85,24 +112,35 @@ async function init() {
 
 // Connect wallet
 async function connectWallet() {
+    console.log('connectWallet function called');
     try {
+        console.log('Checking provider...');
         if (!provider) {
+            console.error('Provider not initialized');
             alert('Please install MetaMask first!');
             return;
         }
+        console.log('Provider found:', provider);
 
         // Request account access - use more compatible method
         let accounts;
+        console.log('Requesting accounts...');
         try {
             // Try the newer method first
+            console.log('Trying provider.send method...');
             accounts = await provider.send("eth_requestAccounts", []);
+            console.log('Accounts received via provider.send:', accounts);
         } catch (error) {
+            console.log('provider.send failed, trying window.ethereum.request...');
             // Fallback to older method
             try {
                 accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                console.log('Accounts received via window.ethereum.request:', accounts);
             } catch (fallbackError) {
+                console.log('window.ethereum.request failed, trying window.ethereum.enable...');
                 // Try the most basic method
                 accounts = await window.ethereum.enable();
+                console.log('Accounts received via window.ethereum.enable:', accounts);
             }
         }
         
@@ -448,21 +486,61 @@ async function calculateSwapAmounts() {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
+    console.log('Testing basic functionality...');
+    
+    // Test if basic JavaScript is working
+    try {
+        const testElement = document.getElementById('swapBtn');
+        console.log('Found swap button:', testElement);
+        
+        // Test if ethers is loaded
+        if (typeof ethers !== 'undefined') {
+            console.log('Ethers.js is loaded');
+        } else {
+            console.error('Ethers.js is NOT loaded');
+        }
+        
+        // Test if MetaMask is available
+        if (typeof window.ethereum !== 'undefined') {
+            console.log('MetaMask is available');
+        } else {
+            console.error('MetaMask is NOT available');
+        }
+        
+    } catch (error) {
+        console.error('Error in DOMContentLoaded:', error);
+    }
+    
     init();
     
-    // Add input event listeners for real-time calculation
-    document.getElementById('fromAmount').addEventListener('input', calculateSwapAmounts);
-    document.getElementById('fromToken').addEventListener('change', calculateSwapAmounts);
-    document.getElementById('toToken').addEventListener('change', calculateSwapAmounts);
+    // Add input event listeners for real-time calculation (with error handling)
+    try {
+        const fromAmount = document.getElementById('fromAmount');
+        const fromToken = document.getElementById('fromToken');
+        const toToken = document.getElementById('toToken');
+        
+        if (fromAmount) fromAmount.addEventListener('input', calculateSwapAmounts);
+        if (fromToken) fromToken.addEventListener('change', calculateSwapAmounts);
+        if (toToken) toToken.addEventListener('change', calculateSwapAmounts);
+    } catch (error) {
+        console.error('Error adding input event listeners:', error);
+    }
     
     // Initialize MEV protection switch (even if wallet not connected)
-    initializeMEVProtectionSwitch();
+    try {
+        initializeMEVProtectionSwitch();
+    } catch (error) {
+        console.error('Error initializing MEV protection switch:', error);
+    }
     
     // Update MEV analytics every 30 seconds
-    setInterval(updateMEVAnalytics, 30000);
-    
-    // Initial MEV analytics update
-    updateMEVAnalytics();
+    try {
+        setInterval(updateMEVAnalytics, 30000);
+        updateMEVAnalytics();
+    } catch (error) {
+        console.error('Error setting up MEV analytics:', error);
+    }
 });
 
 // Utility function to format addresses
@@ -730,6 +808,28 @@ async function loadUserMEVProtectionStatus() {
     } catch (error) {
         console.error('Error loading user MEV protection status:', error);
     }
+}
+
+// Test connection function
+function testConnection() {
+    console.log('=== Connection Test ===');
+    console.log('Ethers available:', typeof ethers !== 'undefined');
+    console.log('MetaMask available:', typeof window.ethereum !== 'undefined');
+    console.log('Provider:', provider);
+    console.log('Signer:', signer);
+    console.log('Connected:', connected);
+    
+    if (typeof ethers !== 'undefined') {
+        console.log('Ethers version:', ethers.version);
+    }
+    
+    if (typeof window.ethereum !== 'undefined') {
+        console.log('MetaMask isConnected:', window.ethereum.isMetaMask);
+        console.log('MetaMask selectedAddress:', window.ethereum.selectedAddress);
+        console.log('MetaMask chainId:', window.ethereum.chainId);
+    }
+    
+    alert('Check browser console for connection test results');
 }
 
 // Show notification to user

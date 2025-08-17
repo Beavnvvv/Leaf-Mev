@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethers.js Loading Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Ethers.js Loading Test</h1>
+    <div id="status"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <script>
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML += `<div class="status ${type}">${message}</div>`;
+            console.log(message);
+        }
+
+        // 测试ethers.js加载
+        function testEthersLoading() {
+            updateStatus('Testing ethers.js loading...', 'info');
+            
+            if (typeof ethers !== 'undefined') {
+                updateStatus('✅ Ethers.js loaded successfully!', 'success');
+                updateStatus(`Version: ${ethers.version}`, 'info');
+                
+                // 测试基本功能
+                try {
+                    const testProvider = new ethers.providers.JsonRpcProvider();
+                    updateStatus('✅ Provider creation successful', 'success');
+                } catch (error) {
+                    updateStatus(`❌ Provider creation failed: ${error.message}`, 'error');
+                }
+                
+            } else {
+                updateStatus('❌ Ethers.js not loaded!', 'error');
+            }
+        }
+
+        // 页面加载完成后测试
+        window.onload = function() {
+            updateStatus('Page loaded, testing ethers.js...', 'info');
+            setTimeout(testEthersLoading, 1000); // 给一点时间让脚本加载
+        };
+    </script>
+</body>
+</html>

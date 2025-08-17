@@ -114,18 +114,71 @@
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
+        
+        /* Wallet Connect Styles */
+        .wallet-connect-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .wallet-connect-container .btn {
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .wallet-connect-container .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .wallet-connect-container .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+        }
+        
+        .wallet-connect-container .btn-outline-light {
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .wallet-connect-container .btn-outline-light:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        #networkInfo {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
     <div class="container py-5">
+        <!-- Header with wallet connection -->
+        <div class="row mb-5">
+            <div class="col-8">
+                <h1 class="text-white display-4 fw-bold">
+                    <i class="fas fa-leaf me-3"></i>Leafswap
+                </h1>
+                <p class="text-white-50 lead">Secure DeFi Exchange with Enhanced Protection</p>
+            </div>
+            <div class="col-4 text-end">
+                <div class="wallet-connect-container">
+                    <button class="btn btn-outline-light btn-lg" onclick="connectWallet()" id="walletConnectBtn">
+                        <i class="fas fa-wallet me-2"></i>Connect Wallet
+                    </button>
+                    <div class="mt-2">
+                        <small class="text-white-50" id="networkInfo">Sepolia Testnet</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="row justify-content-center">
             <div class="col-lg-8">
-                <div class="text-center mb-5">
-                    <h1 class="text-white display-4 fw-bold">
-                        <i class="fas fa-leaf me-3"></i>Leafswap
-                    </h1>
-                    <p class="text-white-50 lead">Secure DeFi Exchange with Enhanced Protection</p>
-                </div>
 
                 <div class="card">
                     <div class="card-body p-4">
@@ -237,9 +290,6 @@
                                 </div>
 
                                 <div class="d-grid gap-2 mt-4">
-                                    <button class="btn btn-primary btn-lg" onclick="connectWallet()">
-                                        <i class="fas fa-wallet me-2"></i>Connect Wallet
-                                    </button>
                                     <button class="btn btn-primary btn-lg" onclick="swapTokens()" id="swapBtn" disabled>
                                         <i class="fas fa-exchange-alt me-2"></i>Swap
                                     </button>
@@ -454,8 +504,21 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script src="app-final.js"></script>
+<script>
+    // 验证函数是否加载
+    console.log('=== Function Loading Test ===');
+    console.log('connectWallet function:', typeof connectWallet);
+    console.log('testConnection function:', typeof testConnection);
+    console.log('swapTokens function:', typeof swapTokens);
+    
+    if (typeof connectWallet === 'undefined') {
+        console.error('connectWallet function is not defined!');
+        alert('JavaScript functions not loaded properly. Please refresh the page.');
+    } else {
+        console.log('All functions loaded successfully!');
+    }
+</script>
 </body>
 </html>
