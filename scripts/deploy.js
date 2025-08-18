@@ -6,11 +6,31 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
+  // Deploy MEVGuard first
+  const MEVGuard = await ethers.getContractFactory("MEVGuard");
+  const mevGuard = await MEVGuard.deploy(
+    deployer.address,
+    100, // antiFrontDefendBlock
+    100, // antiMEVFeePercentage
+    50,  // antiMEVAmountOutLimitRate
+    "0x0000000000000000000000000000000000000001" // 模拟的SubscriptionConsumer地址
+  );
+  await mevGuard.deployed();
+  console.log("MEVGuard deployed to:", mevGuard.address);
+
   // Deploy Factory
-  const LeafswapFactory = await ethers.getContractFactory("LeafswapFactory");
-  const factory = await LeafswapFactory.deploy(deployer.address);
+  const LeafswapAMMFactory = await ethers.getContractFactory("LeafswapAMMFactory");
+  const factory = await LeafswapAMMFactory.deploy(
+    deployer.address, // feeToSetter
+    30, // swapFeeRate: 0.3%
+    mevGuard.address // MEVGuard
+  );
   await factory.deployed();
-  console.log("LeafswapFactory deployed to:", factory.address);
+  console.log("LeafswapAMMFactory deployed to:", factory.address);
+
+  // Set factory permissions
+  await mevGuard.setFactoryStatus(factory.address, true);
+  console.log("Factory permissions set in MEVGuard");
 
   // Deploy Router
   const LeafswapRouter = await ethers.getContractFactory("LeafswapRouter");

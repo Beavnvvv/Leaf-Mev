@@ -2,10 +2,10 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("Simple MEV Test", function () {
-    let mevGuard, owner;
+    let mevGuard, owner, factory;
     
     beforeEach(async function () {
-        [owner] = await ethers.getSigners();
+        [owner, factory] = await ethers.getSigners();
         
         // 部署MEVGuard
         const MEVGuard = await ethers.getContractFactory("MEVGuard");
@@ -34,7 +34,12 @@ describe("Simple MEV Test", function () {
         it("应该正确设置防抢跑边界", async function () {
             const pairAddress = "0x1234567890123456789012345678901234567890";
             const startBlock = 1000;
-            await mevGuard.setAntiFrontDefendBlockEdge(pairAddress, startBlock);
+            
+            // 首先设置工厂权限
+            await mevGuard.setFactoryStatus(factory.address, true);
+            
+            // 然后通过工厂调用设置防抢跑边界
+            await mevGuard.connect(factory).setAntiFrontDefendBlockEdge(pairAddress, startBlock);
             expect(await mevGuard.antiFrontDefendBlockEdges(pairAddress)).to.equal(startBlock + 100);
         });
     });

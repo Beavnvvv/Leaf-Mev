@@ -25,18 +25,18 @@ module.exports = {
     },
     sepolia: {
       url: process.env.SEPOLIA_URL || "https://eth-sepolia.g.alchemy.com/v2/demo",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY && process.env.PRIVATE_KEY.length === 64 ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
       gasPrice: 20000000000, // 20 gwei
     },
     testnet: {
       url: process.env.TESTNET_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY && process.env.PRIVATE_KEY.length === 64 ? [process.env.PRIVATE_KEY] : [],
       chainId: 5, // Goerli
     },
     mainnet: {
       url: process.env.MAINNET_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY && process.env.PRIVATE_KEY.length === 64 ? [process.env.PRIVATE_KEY] : [],
       chainId: 1,
     },
   },

@@ -26,8 +26,25 @@ let CONTRACT_ADDRESSES = {
 
 // Update contract addresses from config if available
 function updateContractAddresses() {
-    // For now, use default addresses since config.js is not loaded
-    console.log('Using default contract addresses:', CONTRACT_ADDRESSES);
+    if (window.LEAFSWAP_CONFIG && window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES) {
+        const networkName = getCurrentNetworkName();
+        const addresses = window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES[networkName];
+        if (addresses) {
+            Object.assign(CONTRACT_ADDRESSES, addresses);
+            console.log('Updated contract addresses for network:', networkName, addresses);
+        }
+    }
+    console.log('Using contract addresses:', CONTRACT_ADDRESSES);
+}
+
+// Get current network name
+function getCurrentNetworkName() {
+    if (window.ethereum && window.ethereum.chainId) {
+        const chainId = parseInt(window.ethereum.chainId, 16);
+        if (chainId === 31337) return 'localhost';
+        if (chainId === 11155111) return 'sepolia';
+    }
+    return 'localhost'; // default
 }
 
 // Basic ABI definitions

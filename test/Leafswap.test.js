@@ -8,8 +8,26 @@ describe("Leafswap", function () {
     [owner, user1, user2] = await ethers.getSigners();
 
     // Deploy contracts
-    const LeafswapFactory = await ethers.getContractFactory("LeafswapFactory");
-    factory = await LeafswapFactory.deploy(owner.address);
+    // 首先部署MEVGuard
+    const MEVGuard = await ethers.getContractFactory("MEVGuard");
+    const mevGuard = await MEVGuard.deploy(
+        owner.address,
+        100, // antiFrontDefendBlock
+        100, // antiMEVFeePercentage
+        50,  // antiMEVAmountOutLimitRate
+        "0x0000000000000000000000000000000000000001" // 模拟的SubscriptionConsumer地址
+    );
+    
+    // 部署新的LeafswapAMMFactory
+    const LeafswapAMMFactory = await ethers.getContractFactory("LeafswapAMMFactory");
+    factory = await LeafswapAMMFactory.deploy(
+        owner.address, // feeToSetter
+        30, // swapFeeRate: 0.3%
+        mevGuard.address // MEVGuard
+    );
+    
+    // 设置工厂权限
+    await mevGuard.setFactoryStatus(factory.address, true);
 
     const WETH9 = await ethers.getContractFactory("WETH9");
     weth = await WETH9.deploy();
@@ -39,7 +57,7 @@ describe("Leafswap", function () {
       await factory.createPair(tokenA.address, tokenB.address);
       await expect(
         factory.createPair(tokenA.address, tokenB.address)
-      ).to.be.revertedWith("Leafswap: PAIR_EXISTS");
+      ).to.be.revertedWith("PairExists");
     });
   });
 
@@ -63,7 +81,7 @@ describe("Leafswap", function () {
         0,
         0,
         user1.address,
-        Math.floor(Date.now() / 1000) + 60
+        Math.floor(Date.now() / 1000) + 300
       );
 
       const pairAddress = await factory.getPair(tokenA.address, tokenB.address);
@@ -88,7 +106,7 @@ describe("Leafswap", function () {
         0,
         0,
         user1.address,
-        Math.floor(Date.now() / 1000) + 60
+        Math.floor(Date.now() / 1000) + 300
       );
 
       // Now swap
