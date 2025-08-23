@@ -441,20 +441,32 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label">MEV Fee (%)</label>
-                                    <input type="number" class="form-control" id="mevFee" value="1.0" min="0.1" max="5.0" step="0.1">
-                                    <small class="text-muted">Range: 0.1-5.0%</small>
+                                    <label class="form-label">Swap Fee Rate (%)</label>
+                                    <input type="number" class="form-control" id="swapFeeRate" value="0.3" min="0.1" max="10.0" step="0.1">
+                                    <small class="text-muted">Range: 0.1-10.0%</small>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label">Min Transaction Size (%)</label>
-                                    <input type="number" class="form-control" id="minTxSize" value="0.5" min="0.1" max="2.0" step="0.1">
-                                    <small class="text-muted">Range: 0.1-2.0%</small>
+                                    <label class="form-label">Max Slippage (%)</label>
+                                    <input type="number" class="form-control" id="maxSlippage" value="5.0" min="0.1" max="20.0" step="0.1">
+                                    <small class="text-muted">Range: 0.1-20.0%</small>
                                 </div>
                                 
-                                <button class="btn btn-primary w-100" onclick="updateMEVConfig()" id="updateConfigBtn">
+                                <div class="mb-3">
+                                    <label class="form-label">Min Liquidity (ETH)</label>
+                                    <input type="number" class="form-control" id="minLiquidity" value="0.1" min="0.01" max="10.0" step="0.01">
+                                    <small class="text-muted">Range: 0.01-10.0 ETH</small>
+                                </div>
+                                
+                                <button class="btn btn-primary w-100" onclick="updateConfigManager()" id="updateConfigBtn">
                                     <i class="fas fa-save me-2"></i>Update Configuration
                                 </button>
+                                
+                                <div class="mt-3">
+                                    <button class="btn btn-info w-100" onclick="loadCurrentConfig()" id="loadConfigBtn">
+                                        <i class="fas fa-sync me-2"></i>Load Current Config
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

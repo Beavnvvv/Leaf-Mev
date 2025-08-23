@@ -1,0 +1,13 @@
+{
+  "network": "sepolia",
+  "deployer": "0xfb35053Bd39dD936f5B430DD5e73E0A6d9B02C85",
+  "contractName": "ConfigManager",
+  "contractAddress": "0x90a9095521e1857d1923660feB9aD428eC9c2580",
+  "initialConfig": {
+    "swapFeeRate": 30,
+    "maxSlippage": 500,
+    "minLiquidity": "100000000000000000"
+  },
+  "deploymentTime": "2025-08-23T08:01:02.551Z",
+  "explorerUrl": "https://sepolia.etherscan.io/address/0x90a9095521e1857d1923660feB9aD428eC9c2580"
+}

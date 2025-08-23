@@ -21,7 +21,8 @@ let CONTRACT_ADDRESSES = {
     weth: '',
     tokenA: '',
     tokenB: '',
-    mevGuard: ''
+    mevGuard: '',
+    configManager: ''
 };
 
 // Update contract addresses from config if available
@@ -64,6 +65,15 @@ const FACTORY_ABI = [
 const MEVGUARD_ABI = [
     "function isUserMEVEnabled(address user) external view returns (bool)",
     "function setUserMEVEnabled(address user, bool enabled) external"
+];
+
+const CONFIG_MANAGER_ABI = [
+    "function updateConfig(uint256 _newSwapFeeRate, uint256 _newMaxSlippage, uint256 _newMinLiquidity) external",
+    "function getConfig() external view returns (uint256 swapFeeRate, uint256 maxSlippage, uint256 minLiquidity)",
+    "function isConfigValid() external view returns (bool)",
+    "function pause() external",
+    "function unpause() external",
+    "function owner() external view returns (address)"
 ];
 
 const TOKEN_ABI = [
@@ -695,3 +705,192 @@ function switchTokens() {
 }
 
 console.log('app-final.js loaded successfully');
+
+// ===== ConfigManager Functions =====
+
+// Load current configuration from contract
+async function loadCurrentConfig() {
+    try {
+        if (!provider || !signer) {
+            alert('Please connect wallet first');
+            return;
+        }
+        
+        if (!CONTRACT_ADDRESSES.configManager) {
+            alert('ConfigManager contract address not found. Please deploy the contract first.');
+            return;
+        }
+        
+        console.log('Loading current configuration from contract...');
+        
+        const configManager = new ethers.Contract(
+            CONTRACT_ADDRESSES.configManager,
+            CONFIG_MANAGER_ABI,
+            provider
+        );
+        
+        const config = await configManager.getConfig();
+        const isValid = await configManager.isConfigValid();
+        const owner = await configManager.owner();
+        
+        console.log('Current config:', {
+            swapFeeRate: config.swapFeeRate.toString(),
+            maxSlippage: config.maxSlippage.toString(),
+            minLiquidity: config.minLiquidity.toString(),
+            isValid: isValid,
+            owner: owner
+        });
+        
+        // Update UI with current values
+        const swapFeeRateInput = document.getElementById('swapFeeRate');
+        const maxSlippageInput = document.getElementById('maxSlippage');
+        const minLiquidityInput = document.getElementById('minLiquidity');
+        
+        if (swapFeeRateInput) {
+            swapFeeRateInput.value = (config.swapFeeRate / 100).toFixed(1);
+        }
+        if (maxSlippageInput) {
+            maxSlippageInput.value = (config.maxSlippage / 100).toFixed(1);
+        }
+        if (minLiquidityInput) {
+            minLiquidityInput.value = ethers.utils.formatEther(config.minLiquidity);
+        }
+        
+        // Show success message
+        const message = `Configuration loaded successfully!\n\n` +
+                       `Swap Fee Rate: ${(config.swapFeeRate / 100).toFixed(1)}%\n` +
+                       `Max Slippage: ${(config.maxSlippage / 100).toFixed(1)}%\n` +
+                       `Min Liquidity: ${ethers.utils.formatEther(config.minLiquidity)} ETH\n` +
+                       `Valid: ${isValid ? 'Yes' : 'No'}\n` +
+                       `Owner: ${owner}`;
+        
+        alert(message);
+        
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        alert('Error loading configuration: ' + error.message);
+    }
+}
+
+// Update configuration in contract
+async function updateConfigManager() {
+    try {
+        if (!provider || !signer) {
+            alert('Please connect wallet first');
+            return;
+        }
+        
+        if (!CONTRACT_ADDRESSES.configManager) {
+            alert('ConfigManager contract address not found. Please deploy the contract first.');
+            return;
+        }
+        
+        // Get values from UI
+        const swapFeeRateInput = document.getElementById('swapFeeRate');
+        const maxSlippageInput = document.getElementById('maxSlippage');
+        const minLiquidityInput = document.getElementById('minLiquidity');
+        
+        if (!swapFeeRateInput || !maxSlippageInput || !minLiquidityInput) {
+            alert('Configuration inputs not found');
+            return;
+        }
+        
+        const swapFeeRatePercent = parseFloat(swapFeeRateInput.value);
+        const maxSlippagePercent = parseFloat(maxSlippageInput.value);
+        const minLiquidityEth = parseFloat(minLiquidityInput.value);
+        
+        // Validate inputs
+        if (isNaN(swapFeeRatePercent) || swapFeeRatePercent < 0.1 || swapFeeRatePercent > 10.0) {
+            alert('Swap Fee Rate must be between 0.1% and 10.0%');
+            return;
+        }
+        
+        if (isNaN(maxSlippagePercent) || maxSlippagePercent < 0.1 || maxSlippagePercent > 20.0) {
+            alert('Max Slippage must be between 0.1% and 20.0%');
+            return;
+        }
+        
+        if (isNaN(minLiquidityEth) || minLiquidityEth < 0.01 || minLiquidityEth > 10.0) {
+            alert('Min Liquidity must be between 0.01 and 10.0 ETH');
+            return;
+        }
+        
+        // Convert to contract format (basis points and wei)
+        const swapFeeRateBps = Math.round(swapFeeRatePercent * 100);
+        const maxSlippageBps = Math.round(maxSlippagePercent * 100);
+        const minLiquidityWei = ethers.utils.parseEther(minLiquidityEth.toString());
+        
+        console.log('Updating configuration with values:', {
+            swapFeeRateBps: swapFeeRateBps,
+            maxSlippageBps: maxSlippageBps,
+            minLiquidityWei: minLiquidityWei.toString()
+        });
+        
+        // Create contract instance
+        const configManager = new ethers.Contract(
+            CONTRACT_ADDRESSES.configManager,
+            CONFIG_MANAGER_ABI,
+            signer
+        );
+        
+        // Check if current user is owner
+        const owner = await configManager.owner();
+        const currentAddress = await signer.getAddress();
+        
+        if (owner.toLowerCase() !== currentAddress.toLowerCase()) {
+            alert('Only the contract owner can update configuration. Current owner: ' + owner);
+            return;
+        }
+        
+        // Disable button during transaction
+        const updateBtn = document.getElementById('updateConfigBtn');
+        if (updateBtn) {
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+        }
+        
+        // Send transaction
+        const tx = await configManager.updateConfig(
+            swapFeeRateBps,
+            maxSlippageBps,
+            minLiquidityWei,
+            {
+                gasLimit: 300000,
+                gasPrice: ethers.utils.parseUnits("2", "gwei")
+            }
+        );
+        
+        console.log('Transaction sent:', tx.hash);
+        
+        // Wait for confirmation
+        const receipt = await tx.wait();
+        console.log('Transaction confirmed:', receipt);
+        
+        // Re-enable button
+        if (updateBtn) {
+            updateBtn.disabled = false;
+            updateBtn.innerHTML = '<i class="fas fa-save me-2"></i>Update Configuration';
+        }
+        
+        // Show success message
+        alert(`Configuration updated successfully!\n\n` +
+              `Transaction Hash: ${tx.hash}\n` +
+              `Block Number: ${receipt.blockNumber}\n\n` +
+              `New Configuration:\n` +
+              `- Swap Fee Rate: ${swapFeeRatePercent}%\n` +
+              `- Max Slippage: ${maxSlippagePercent}%\n` +
+              `- Min Liquidity: ${minLiquidityEth} ETH`);
+        
+    } catch (error) {
+        console.error('Error updating configuration:', error);
+        
+        // Re-enable button on error
+        const updateBtn = document.getElementById('updateConfigBtn');
+        if (updateBtn) {
+            updateBtn.disabled = false;
+            updateBtn.innerHTML = '<i class="fas fa-save me-2"></i>Update Configuration';
+        }
+        
+        alert('Error updating configuration: ' + error.message);
+    }
+}
