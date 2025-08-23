@@ -77,7 +77,7 @@ contract LeafswapAMMFactory is ILeafAMMFactory {
         
         if (getPair[token0][token1] != address(0)) revert ILeafAMMFactory.PairExists();
         
-        // 使用CREATE2创建交易对
+        // 使用CREATE2创建交易对，包含构造函数参数
         bytes memory bytecode = type(LeafswapPair).creationCode;
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
         

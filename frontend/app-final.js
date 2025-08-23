@@ -26,9 +26,9 @@ let CONTRACT_ADDRESSES = {
 
 // Update contract addresses from config if available
 function updateContractAddresses() {
-    if (window.LEAFSWAP_CONFIG && window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES) {
+    if (window.LEAFSWAP_CONFIG && window.LEAFSWAP_CONFIG.networks) {
         const networkName = getCurrentNetworkName();
-        const addresses = window.LEAFSWAP_CONFIG.CONTRACT_ADDRESSES[networkName];
+        const addresses = window.LEAFSWAP_CONFIG.networks[networkName];
         if (addresses) {
             Object.assign(CONTRACT_ADDRESSES, addresses);
             console.log('Updated contract addresses for network:', networkName, addresses);
@@ -44,13 +44,16 @@ function getCurrentNetworkName() {
         if (chainId === 31337) return 'localhost';
         if (chainId === 11155111) return 'sepolia';
     }
-    return 'localhost'; // default
+    return 'sepolia'; // default to sepolia for testing
 }
 
 // Basic ABI definitions
 const ROUTER_ABI = [
     "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
-    "function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts)"
+    "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+    "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
+    "function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts)",
+    "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 amountA, uint256 amountB, uint256 liquidity)"
 ];
 
 const FACTORY_ABI = [
@@ -61,6 +64,16 @@ const FACTORY_ABI = [
 const MEVGUARD_ABI = [
     "function isUserMEVEnabled(address user) external view returns (bool)",
     "function setUserMEVEnabled(address user, bool enabled) external"
+];
+
+const TOKEN_ABI = [
+    "function balanceOf(address owner) external view returns (uint256)",
+    "function approve(address spender, uint256 amount) external returns (bool)",
+    "function allowance(address owner, address spender) external view returns (uint256)",
+    "function transfer(address to, uint256 amount) external returns (bool)",
+    "function name() external view returns (string)",
+    "function symbol() external view returns (string)",
+    "function decimals() external view returns (uint8)"
 ];
 
 // Check and switch to Sepolia network
@@ -100,166 +113,56 @@ async function checkAndSwitchNetwork() {
                         console.log('Successfully added Sepolia network');
                     } catch (addError) {
                         console.error('Failed to add Sepolia network:', addError);
-                        alert('Please add Sepolia testnet to MetaMask manually');
+                        alert('Please manually add Sepolia testnet to MetaMask');
                     }
                 } else {
                     console.error('Failed to switch to Sepolia network:', switchError);
-                    alert('Please switch to Sepolia testnet manually');
+                    alert('Please manually switch to Sepolia testnet in MetaMask');
                 }
             }
         } else {
             console.log('Already on Sepolia network');
         }
-        
-        updateNetworkInfo();
     } catch (error) {
-        console.error('Error checking network:', error);
+        console.error('Error checking/switching network:', error);
     }
 }
 
-// Update network information display
-function updateNetworkInfo() {
-    try {
-        const networkInfo = document.getElementById('networkInfo');
-        if (networkInfo && window.ethereum) {
-            window.ethereum.request({ method: 'eth_chainId' }).then(chainId => {
-                let networkName = 'Unknown Network';
-                let networkClass = 'text-warning';
-                
-                switch (chainId) {
-                    case '0x1':
-                        networkName = 'Ethereum Mainnet';
-                        networkClass = 'text-danger';
-                        break;
-                    case '0xaa36a7':
-                        networkName = 'Sepolia Testnet';
-                        networkClass = 'text-success';
-                        break;
-                    case '0x5':
-                        networkName = 'Goerli Testnet';
-                        networkClass = 'text-info';
-                        break;
-                    case '0x539':
-                        networkName = 'Local Network';
-                        networkClass = 'text-secondary';
-                        break;
-                }
-                
-                networkInfo.textContent = networkName;
-                networkInfo.className = `text-white-50 ${networkClass}`;
-            });
-        }
-    } catch (error) {
-        console.error('Error updating network info:', error);
-    }
-}
-
-// Initialize the application
-async function init() {
-    console.log('Initializing application...');
-    try {
-        // Update contract addresses from config
-        updateContractAddresses();
-        
-        // Check if ethers is available
-        if (typeof ethers === 'undefined') {
-            console.error('Ethers.js not loaded!');
-            alert('Ethers.js library not loaded. Please refresh the page.');
-            return;
-        }
-        console.log('Ethers.js loaded successfully');
-
-        // Check if MetaMask is installed
-        if (typeof window.ethereum !== 'undefined') {
-            console.log('MetaMask detected');
-            provider = new ethers.providers.Web3Provider(window.ethereum);
-            console.log('Provider created:', provider);
-            
-            // Check and switch to Sepolia network
-            await checkAndSwitchNetwork();
-            
-            // Listen for account changes
-            window.ethereum.on('accountsChanged', function (accounts) {
-                console.log('Account changed:', accounts);
-                window.location.reload();
-            });
-
-            // Listen for chain changes
-            window.ethereum.on('chainChanged', function (chainId) {
-                console.log('Chain changed:', chainId);
-                updateNetworkInfo();
-            });
-
-            console.log('MetaMask is installed and configured!');
-        } else {
-            console.error('MetaMask not detected');
-            alert('Please install MetaMask to use Leafswap!');
-            return;
-        }
-    } catch (error) {
-        console.error('Error initializing app:', error);
-    }
-}
-
-// Connect wallet
+// Connect wallet function
 async function connectWallet() {
-    console.log('connectWallet function called');
     try {
-        console.log('Checking provider...');
-        if (!provider) {
-            console.error('Provider not initialized');
-            alert('Please install MetaMask first!');
+        console.log('Connecting wallet...');
+        
+        if (!window.ethereum) {
+            alert('Please install MetaMask!');
             return;
         }
-        console.log('Provider found:', provider);
 
         // Request account access
-        let accounts;
-        console.log('Requesting accounts...');
-        try {
-            console.log('Trying provider.send method...');
-            accounts = await provider.send("eth_requestAccounts", []);
-            console.log('Accounts received via provider.send:', accounts);
-        } catch (error) {
-            console.log('provider.send failed, trying window.ethereum.request...');
-            try {
-                accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                console.log('Accounts received via window.ethereum.request:', accounts);
-            } catch (fallbackError) {
-                console.log('window.ethereum.request failed, trying window.ethereum.enable...');
-                accounts = await window.ethereum.enable();
-                console.log('Accounts received via window.ethereum.enable:', accounts);
-            }
-        }
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const account = accounts[0];
         
-        if (!accounts || accounts.length === 0) {
-            throw new Error('No accounts found');
-        }
+        console.log('Connected account:', account);
         
+        // Create provider and signer
+        provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
-        const address = await signer.getAddress();
         
-        connected = true;
+        // Check and switch to Sepolia network
+        await checkAndSwitchNetwork();
         
-        // Update UI
-        const swapBtn = document.getElementById('swapBtn');
-        if (swapBtn) swapBtn.disabled = false;
-        
-        const walletConnectBtn = document.getElementById('walletConnectBtn');
-        if (walletConnectBtn) {
-            walletConnectBtn.innerHTML = `<i class="fas fa-check me-2"></i>${address.slice(0, 6)}...${address.slice(-4)}`;
-            walletConnectBtn.className = 'btn btn-success btn-lg';
-            walletConnectBtn.onclick = function() {
-                // Show wallet info or disconnect
-                alert(`Connected to: ${address}\nNetwork: Sepolia Testnet`);
-            };
-        }
+        // Update contract addresses
+        updateContractAddresses();
         
         // Initialize contracts
         await initializeContracts();
         
-        console.log('Wallet connected:', address);
-        alert('Wallet connected successfully: ' + address);
+        // Update UI
+        updateNetworkInfo();
+        updateWalletInfo();
+        
+        connected = true;
+        console.log('Wallet connected successfully');
         
     } catch (error) {
         console.error('Error connecting wallet:', error);
@@ -267,99 +170,528 @@ async function connectWallet() {
     }
 }
 
-// Initialize smart contracts
+// Initialize contracts
 async function initializeContracts() {
     try {
-        // Initialize router contract
-        if (CONTRACT_ADDRESSES.router) {
-            router = new ethers.Contract(CONTRACT_ADDRESSES.router, ROUTER_ABI, signer);
+        console.log('Initializing contracts...');
+        
+        if (!CONTRACT_ADDRESSES.factory || !CONTRACT_ADDRESSES.router || !CONTRACT_ADDRESSES.mevGuard) {
+            console.error('Contract addresses not loaded');
+            return;
         }
         
-        // Initialize factory contract
-        if (CONTRACT_ADDRESSES.factory) {
-            factory = new ethers.Contract(CONTRACT_ADDRESSES.factory, FACTORY_ABI, signer);
-        }
+        // Initialize contract instances
+        factory = new ethers.Contract(CONTRACT_ADDRESSES.factory, FACTORY_ABI, signer);
+        router = new ethers.Contract(CONTRACT_ADDRESSES.router, ROUTER_ABI, signer);
+        mevGuard = new ethers.Contract(CONTRACT_ADDRESSES.mevGuard, MEVGUARD_ABI, signer);
         
-        // Initialize MEVGuard contract
-        if (CONTRACT_ADDRESSES.mevGuard) {
-            mevGuard = new ethers.Contract(CONTRACT_ADDRESSES.mevGuard, MEVGUARD_ABI, signer);
-            console.log('MEVGuard contract initialized');
-        }
+        console.log('Contracts initialized:', {
+            factory: factory.address,
+            router: router.address,
+            mevGuard: mevGuard.address
+        });
         
-        console.log('Contracts initialized');
+        // Load token balances
+        await loadTokenBalances();
+        
     } catch (error) {
         console.error('Error initializing contracts:', error);
     }
 }
 
-// Test connection function
-function testConnection() {
-    console.log('=== Connection Test ===');
-    console.log('Ethers available:', typeof ethers !== 'undefined');
-    console.log('MetaMask available:', typeof window.ethereum !== 'undefined');
-    console.log('Provider:', provider);
-    console.log('Signer:', signer);
-    console.log('Connected:', connected);
-    
-    if (typeof ethers !== 'undefined') {
-        console.log('Ethers version:', ethers.version);
-    }
-    
-    if (typeof window.ethereum !== 'undefined') {
-        console.log('MetaMask isConnected:', window.ethereum.isMetaMask);
-        console.log('MetaMask selectedAddress:', window.ethereum.selectedAddress);
-        console.log('MetaMask chainId:', window.ethereum.chainId);
-    }
-    
-    alert('Check browser console for connection test results');
-}
-
-// Placeholder functions for UI compatibility
-async function swapTokens() {
-    alert('Swap functionality not implemented in simple version');
-}
-
-async function addLiquidity() {
-    alert('Add liquidity functionality not implemented in simple version');
-}
-
-async function removeLiquidity() {
-    alert('Remove liquidity functionality not implemented in simple version');
-}
-
-async function calculateSwapAmounts() {
-    // Placeholder
-}
-
-// Event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded - Final version');
-    console.log('Testing basic functionality...');
-    
-    // Test if basic JavaScript is working
+// Load token balances
+async function loadTokenBalances() {
     try {
-        const testElement = document.getElementById('swapBtn');
-        console.log('Found swap button:', testElement);
-        
-        // Test if ethers is loaded
-        if (typeof ethers !== 'undefined') {
-            console.log('Ethers.js is loaded');
-        } else {
-            console.error('Ethers.js is NOT loaded');
+        if (!CONTRACT_ADDRESSES.tokenA || !CONTRACT_ADDRESSES.tokenB) {
+            console.error('Token addresses not loaded');
+            return;
         }
         
-        // Test if MetaMask is available
-        if (typeof window.ethereum !== 'undefined') {
-            console.log('MetaMask is available');
-        } else {
-            console.error('MetaMask is NOT available');
-        }
+        const tokenA = new ethers.Contract(CONTRACT_ADDRESSES.tokenA, TOKEN_ABI, signer);
+        const tokenB = new ethers.Contract(CONTRACT_ADDRESSES.tokenB, TOKEN_ABI, signer);
+        
+        const account = await signer.getAddress();
+        const balanceA = await tokenA.balanceOf(account);
+        const balanceB = await tokenB.balanceOf(account);
+        
+        // Store balances globally for use in other functions
+        window.tokenBalances = {
+            TKA: ethers.utils.formatEther(balanceA),
+            TKB: ethers.utils.formatEther(balanceB)
+        };
+        
+        // Update UI based on selected tokens
+        updateBalanceDisplay();
+        
+        console.log('Token balances loaded:', window.tokenBalances);
         
     } catch (error) {
-        console.error('Error in DOMContentLoaded:', error);
+        console.error('Error loading token balances:', error);
+    }
+}
+
+// Update balance display based on selected tokens
+function updateBalanceDisplay() {
+    if (!window.tokenBalances) return;
+    
+    const fromTokenSelect = document.getElementById('fromToken');
+    const toTokenSelect = document.getElementById('toToken');
+    const fromBalanceElement = document.getElementById('fromBalance');
+    const toBalanceElement = document.getElementById('toBalance');
+    
+    if (fromTokenSelect && fromBalanceElement) {
+        const fromToken = fromTokenSelect.value;
+        const fromBalance = window.tokenBalances[fromToken] || '0.0';
+        fromBalanceElement.textContent = fromBalance;
     }
     
-    init();
+    if (toTokenSelect && toBalanceElement) {
+        const toToken = toTokenSelect.value;
+        const toBalance = window.tokenBalances[toToken] || '0.0';
+        toBalanceElement.textContent = toBalance;
+    }
+}
+
+// Update network information
+function updateNetworkInfo() {
+    const networkInfo = document.getElementById('networkInfo');
+    if (networkInfo) {
+        networkInfo.textContent = 'Sepolia Testnet';
+    }
+}
+
+// Update wallet information
+function updateWalletInfo() {
+    const walletConnectBtn = document.getElementById('walletConnectBtn');
+    if (walletConnectBtn && signer) {
+        signer.getAddress().then(address => {
+            const shortAddress = address.substring(0, 6) + '...' + address.substring(38);
+            walletConnectBtn.innerHTML = `<i class="fas fa-wallet me-2"></i>${shortAddress}`;
+        });
+    }
+    // 如果没有walletConnectBtn元素，就不更新UI，但也不报错
+}
+
+// Toggle MEV protection
+async function toggleMEVProtection() {
+    try {
+        if (!mevGuard || !signer) {
+            alert('Please connect wallet first');
+            return;
+        }
+        
+        const account = await signer.getAddress();
+        const currentStatus = await mevGuard.isUserMEVEnabled(account);
+        const newStatus = !currentStatus;
+        
+        const tx = await mevGuard.setUserMEVEnabled(account, newStatus);
+        await tx.wait();
+        
+        mevProtectionEnabled = newStatus;
+        updateMEVProtectionUI();
+        
+        console.log('MEV protection toggled:', newStatus);
+        
+    } catch (error) {
+        console.error('Error toggling MEV protection:', error);
+        alert('Failed to toggle MEV protection: ' + error.message);
+    }
+}
+
+// Update MEV protection UI
+function updateMEVProtectionUI() {
+    const mevSwitch = document.getElementById('mevProtectionSwitch');
+    if (mevSwitch) {
+        mevSwitch.checked = mevProtectionEnabled;
+    }
+    
+    const mevStatus = document.getElementById('mevProtectionStatus');
+    if (mevStatus) {
+        if (mevProtectionEnabled) {
+            mevStatus.classList.remove('d-none');
+            mevStatus.classList.add('d-block');
+        } else {
+            mevStatus.classList.remove('d-block');
+            mevStatus.classList.add('d-none');
+        }
+    }
+}
+
+// Swap tokens function
+async function swapTokens() {
+    try {
+        if (!router || !signer) {
+            alert('Please connect wallet first');
+            return;
+        }
+        
+        const amountIn = document.getElementById('fromAmount').value;
+        const amountOutMin = document.getElementById('toAmount').value;
+        
+        if (!amountIn || !amountOutMin) {
+            alert('Please enter swap amounts');
+            return;
+        }
+        
+        const fromTokenSelect = document.getElementById('fromToken');
+        const toTokenSelect = document.getElementById('toToken');
+        
+        if (!fromTokenSelect || !toTokenSelect) {
+            alert('Token selectors not found');
+            return;
+        }
+        
+        const fromToken = fromTokenSelect.value;
+        const toToken = toTokenSelect.value;
+        
+        // Don't swap if same token
+        if (fromToken === toToken) {
+            alert('Cannot swap same token');
+            return;
+        }
+        
+        const amountInWei = ethers.utils.parseEther(amountIn);
+        
+        // Get token addresses based on selection
+        const fromTokenAddress = fromToken === 'TKA' ? CONTRACT_ADDRESSES.tokenA : 
+                                fromToken === 'TKB' ? CONTRACT_ADDRESSES.tokenB : 
+                                CONTRACT_ADDRESSES.weth;
+        const toTokenAddress = toToken === 'TKA' ? CONTRACT_ADDRESSES.tokenA : 
+                              toToken === 'TKB' ? CONTRACT_ADDRESSES.tokenB : 
+                              CONTRACT_ADDRESSES.weth;
+        
+        // Calculate expected output and apply slippage tolerance
+        const path = [fromTokenAddress, toTokenAddress];
+        const amounts = await router.getAmountsOut(amountInWei, path);
+        const expectedOutput = amounts[1];
+        
+        // Apply 5% slippage tolerance (0.95 = 95% of expected output)
+        const slippageTolerance = 0.95;
+        const amountOutMinWei = expectedOutput.mul(ethers.BigNumber.from(Math.floor(slippageTolerance * 1000))).div(1000);
+        
+        console.log('Swap calculation with slippage:', {
+            expectedOutput: ethers.utils.formatEther(expectedOutput),
+            amountOutMin: ethers.utils.formatEther(amountOutMinWei),
+            slippageTolerance: slippageTolerance
+        });
+        const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+        
+        console.log('Swapping tokens:', {
+            fromToken: fromToken,
+            toToken: toToken,
+            amountIn: amountIn,
+            amountOutMin: amountOutMin,
+            path: path,
+            deadline: deadline
+        });
+        
+        // Approve tokens if not swapping ETH
+        if (fromToken !== 'ETH') {
+            const tokenContract = new ethers.Contract(fromTokenAddress, TOKEN_ABI, signer);
+            const allowance = await tokenContract.allowance(await signer.getAddress(), CONTRACT_ADDRESSES.router);
+            
+            if (allowance.lt(amountInWei)) {
+                console.log('Approving tokens...');
+                const approveTx = await tokenContract.approve(CONTRACT_ADDRESSES.router, amountInWei);
+                await approveTx.wait();
+                console.log('Tokens approved');
+            }
+        }
+        
+        let tx;
+        
+        // Choose the appropriate swap function based on token types
+        if (toToken === 'ETH') {
+            // Token to ETH
+            tx = await router.swapExactTokensForETH(
+                amountInWei,
+                amountOutMinWei,
+                path,
+                await signer.getAddress(),
+                deadline
+            );
+        } else if (fromToken === 'ETH') {
+            // ETH to Token
+            tx = await router.swapExactETHForTokens(
+                amountOutMinWei,
+                path,
+                await signer.getAddress(),
+                deadline,
+                { value: amountInWei }
+            );
+        } else {
+            // Token to Token
+            tx = await router.swapExactTokensForTokens(
+                amountInWei,
+                amountOutMinWei,
+                path,
+                await signer.getAddress(),
+                deadline
+            );
+        }
+        
+        console.log('Swap transaction:', tx.hash);
+        alert('Swap transaction submitted: ' + tx.hash);
+        
+        // Wait for confirmation
+        await tx.wait();
+        console.log('Swap completed');
+        
+        // Reload balances
+        await loadTokenBalances();
+        
+    } catch (error) {
+        console.error('Error swapping tokens:', error);
+        alert('Swap failed: ' + error.message);
+    }
+}
+
+// Calculate swap amounts
+async function calculateSwapAmounts() {
+    try {
+        if (!router) {
+            console.error('Router not initialized');
+            return;
+        }
+        
+        const amountIn = document.getElementById('fromAmount').value;
+        if (!amountIn) {
+            document.getElementById('toAmount').value = '';
+            return;
+        }
+        
+        const fromTokenSelect = document.getElementById('fromToken');
+        const toTokenSelect = document.getElementById('toToken');
+        
+        if (!fromTokenSelect || !toTokenSelect) {
+            console.error('Token selectors not found');
+            return;
+        }
+        
+        const fromToken = fromTokenSelect.value;
+        const toToken = toTokenSelect.value;
+        
+        // Get token addresses based on selection
+        const fromTokenAddress = fromToken === 'TKA' ? CONTRACT_ADDRESSES.tokenA : 
+                                fromToken === 'TKB' ? CONTRACT_ADDRESSES.tokenB : 
+                                CONTRACT_ADDRESSES.weth;
+        const toTokenAddress = toToken === 'TKA' ? CONTRACT_ADDRESSES.tokenA : 
+                              toToken === 'TKB' ? CONTRACT_ADDRESSES.tokenB : 
+                              CONTRACT_ADDRESSES.weth;
+        
+        // Don't calculate if same token
+        if (fromToken === toToken) {
+            document.getElementById('toAmount').value = amountIn;
+            return;
+        }
+        
+        const amountInWei = ethers.utils.parseEther(amountIn);
+        const path = [fromTokenAddress, toTokenAddress];
+        
+        const amounts = await router.getAmountsOut(amountInWei, path);
+        const amountOut = ethers.utils.formatEther(amounts[1]);
+        
+        document.getElementById('toAmount').value = amountOut;
+        
+        // 启用Swap按钮
+        const swapBtn = document.getElementById('swapBtn');
+        if (swapBtn) {
+            swapBtn.disabled = false;
+            console.log('Swap button enabled after calculation');
+        }
+        
+        console.log('Swap calculation:', {
+            fromToken: fromToken,
+            toToken: toToken,
+            input: amountIn,
+            output: amountOut,
+            path: path
+        });
+        
+    } catch (error) {
+        console.error('Error calculating swap amounts:', error);
+        document.getElementById('toAmount').value = '';
+        
+        // 禁用Swap按钮
+        const swapBtn = document.getElementById('swapBtn');
+        if (swapBtn) {
+            swapBtn.disabled = true;
+            console.log('Swap button disabled due to calculation error');
+        }
+    }
+}
+
+// Add liquidity function
+async function addLiquidity() {
+    try {
+        if (!router || !signer) {
+            alert('Please connect wallet first');
+            return;
+        }
+        
+        const amountA = document.getElementById('liquidityTokenA').value;
+        const amountB = document.getElementById('liquidityTokenB').value;
+        
+        if (!amountA || !amountB) {
+            alert('Please enter liquidity amounts');
+            return;
+        }
+        
+        const amountAWei = ethers.utils.parseEther(amountA);
+        const amountBWei = ethers.utils.parseEther(amountB);
+        const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+        
+        console.log('Adding liquidity:', {
+            amountA: amountA,
+            amountB: amountB,
+            deadline: deadline
+        });
+        
+        const tx = await router.addLiquidity(
+            CONTRACT_ADDRESSES.tokenA,
+            CONTRACT_ADDRESSES.tokenB,
+            amountAWei,
+            amountBWei,
+            0, // amountAMin
+            0, // amountBMin
+            await signer.getAddress(),
+            deadline
+        );
+        
+        console.log('Add liquidity transaction:', tx.hash);
+        alert('Liquidity transaction submitted: ' + tx.hash);
+        
+        // Wait for confirmation
+        await tx.wait();
+        console.log('Liquidity added');
+        
+        // Reload balances
+        await loadTokenBalances();
+        
+    } catch (error) {
+        console.error('Error adding liquidity:', error);
+        alert('Add liquidity failed: ' + error.message);
+    }
+}
+
+// Update MEV configuration
+function updateMEVConfig() {
+    const protectionDuration = document.getElementById('protectionDuration').value;
+    const mevFee = document.getElementById('mevFee').value;
+    const minTxSize = document.getElementById('minTxSize').value;
+    
+    mevConfig = {
+        protectionDuration: parseInt(protectionDuration),
+        mevFee: parseFloat(mevFee),
+        minTxSize: parseFloat(minTxSize)
+    };
+    
+    console.log('MEV config updated:', mevConfig);
+    alert('MEV configuration updated');
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing...');
+    
+    // Update contract addresses
+    updateContractAddresses();
+    
+    // Add event listeners
+    const fromAmount = document.getElementById('fromAmount');
+    if (fromAmount) {
+        fromAmount.addEventListener('input', calculateSwapAmounts);
+    }
+    
+    const mevSwitch = document.getElementById('mevProtectionSwitch');
+    if (mevSwitch) {
+        mevSwitch.addEventListener('change', toggleMEVProtection);
+    }
+    
+    // Add token selection event listeners
+    const fromTokenSelect = document.getElementById('fromToken');
+    if (fromTokenSelect) {
+        fromTokenSelect.addEventListener('change', updateBalanceDisplay);
+    }
+    
+    const toTokenSelect = document.getElementById('toToken');
+    if (toTokenSelect) {
+        toTokenSelect.addEventListener('change', updateBalanceDisplay);
+    }
+    
+    console.log('Initialization complete');
 });
 
-console.log('Final app.js loaded successfully');
+// Test connection function
+async function testConnection() {
+    try {
+        console.log('Testing connection...');
+        
+        if (!provider) {
+            alert('Please connect wallet first');
+            return;
+        }
+        
+        const network = await provider.getNetwork();
+        const account = await signer.getAddress();
+        
+        console.log('Connection test results:', {
+            network: network.name,
+            chainId: network.chainId,
+            account: account
+        });
+        
+        alert(`Connected to ${network.name} (Chain ID: ${network.chainId})\nAccount: ${account}`);
+        
+    } catch (error) {
+        console.error('Connection test failed:', error);
+        alert('Connection test failed: ' + error.message);
+    }
+}
+
+// Switch tokens function - swaps the from and to tokens
+function switchTokens() {
+    try {
+        const fromTokenSelect = document.getElementById('fromToken');
+        const toTokenSelect = document.getElementById('toToken');
+        const fromAmount = document.getElementById('fromAmount');
+        const toAmount = document.getElementById('toAmount');
+        
+        if (!fromTokenSelect || !toTokenSelect || !fromAmount || !toAmount) {
+            console.error('Token selectors not found');
+            return;
+        }
+        
+        // Store current values
+        const currentFromToken = fromTokenSelect.value;
+        const currentToToken = toTokenSelect.value;
+        const currentFromAmount = fromAmount.value;
+        const currentToAmount = toAmount.value;
+        
+        // Swap tokens
+        fromTokenSelect.value = currentToToken;
+        toTokenSelect.value = currentFromToken;
+        
+        // Swap amounts
+        fromAmount.value = currentToAmount;
+        toAmount.value = currentFromAmount;
+        
+        // Update balance display
+        updateBalanceDisplay();
+        
+        // Recalculate swap amounts if there's an input amount
+        if (currentToAmount && currentToAmount !== '0') {
+            calculateSwapAmounts();
+        }
+        
+        console.log('Tokens switched:', {
+            from: currentFromToken + ' → ' + currentToToken,
+            to: currentToToken + ' → ' + currentFromToken
+        });
+        
+    } catch (error) {
+        console.error('Error switching tokens:', error);
+    }
+}
+
+console.log('app-final.js loaded successfully');

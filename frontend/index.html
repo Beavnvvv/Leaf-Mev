@@ -71,6 +71,9 @@
         .swap-arrow i:hover {
             transform: scale(1.1);
         }
+        .swap-arrow i:active {
+            transform: scale(0.95);
+        }
         .stats-card {
             text-align: center;
             padding: 20px;
@@ -222,7 +225,7 @@
                                 </div>
 
                                 <div class="swap-arrow">
-                                    <i class="fas fa-arrow-down" onclick="swapTokens()"></i>
+                                    <i class="fas fa-arrow-down" onclick="switchTokens()" style="cursor: pointer; transition: transform 0.2s;" title="Switch tokens"></i>
                                 </div>
 
                                 <div class="token-input">
@@ -290,8 +293,8 @@
                                 </div>
 
                                 <div class="d-grid gap-2 mt-4">
-                                    <button class="btn btn-primary btn-lg" onclick="swapTokens()" id="swapBtn" disabled>
-                                        <i class="fas fa-exchange-alt me-2"></i>Swap
+                                    <button class="btn btn-primary btn-lg" onclick="executeSwap()" id="swapBtn" disabled>
+                                        <i class="fas fa-exchange-alt me-2"></i>Swap Tokens
                                     </button>
                                 </div>
 
@@ -504,15 +507,16 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-       <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-       <script src="config.js"></script>
-       <script src="app-final.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script src="config.js?v=1.2"></script>
+<script src="app-final.js?v=1.2"></script>
 <script>
     // 验证函数是否加载
     console.log('=== Function Loading Test ===');
     console.log('connectWallet function:', typeof connectWallet);
     console.log('testConnection function:', typeof testConnection);
     console.log('swapTokens function:', typeof swapTokens);
+    console.log('switchTokens function:', typeof switchTokens);
     
     if (typeof connectWallet === 'undefined') {
         console.error('connectWallet function is not defined!');
@@ -520,6 +524,42 @@
     } else {
         console.log('All functions loaded successfully!');
     }
+    
+    // 新的交换执行函数
+    async function executeSwap() {
+        console.log('executeSwap called');
+        try {
+            // 调用原始的swapTokens函数
+            await swapTokens();
+        } catch (error) {
+            console.error('Swap execution failed:', error);
+            alert('Swap failed: ' + error.message);
+        }
+    }
+    
+    // 启用Swap按钮的函数
+    function enableSwapButton() {
+        const swapBtn = document.getElementById('swapBtn');
+        if (swapBtn) {
+            swapBtn.disabled = false;
+            console.log('Swap button enabled');
+        }
+    }
+    
+    // 禁用Swap按钮的函数
+    function disableSwapButton() {
+        const swapBtn = document.getElementById('swapBtn');
+        if (swapBtn) {
+            swapBtn.disabled = true;
+            console.log('Swap button disabled');
+        }
+    }
+    
+    // 页面加载时启用Swap按钮（用于测试）
+    window.addEventListener('load', function() {
+        console.log('Page loaded, enabling swap button for testing...');
+        setTimeout(enableSwapButton, 1000); // 1秒后启用按钮
+    });
 </script>
 </body>
 </html>
