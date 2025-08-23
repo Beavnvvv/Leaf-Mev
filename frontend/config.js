@@ -18,7 +18,7 @@ window.LEAFSWAP_CONFIG = {
       weth: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
       mevGuard: "0x1527Db198B15099A78209E904aDCcD762EC250E5",
       subscriptionConsumer: "0x5CC1a5329E91Fd5424afd03C42d803DC43904873",
-      configManager: "0x90a9095521e1857d1923660feB9aD428eC9c2580"
+      configManager: "0x02529cA7b1603Dfa49a6b82622e9a7493C473902"
     }
   },
 

@@ -799,21 +799,8 @@ async function updateConfigManager() {
         const maxSlippagePercent = parseFloat(maxSlippageInput.value);
         const minLiquidityEth = parseFloat(minLiquidityInput.value);
         
-        // Validate inputs
-        if (isNaN(swapFeeRatePercent) || swapFeeRatePercent < 0.1 || swapFeeRatePercent > 10.0) {
-            alert('Swap Fee Rate must be between 0.1% and 10.0%');
-            return;
-        }
-        
-        if (isNaN(maxSlippagePercent) || maxSlippagePercent < 0.1 || maxSlippagePercent > 20.0) {
-            alert('Max Slippage must be between 0.1% and 20.0%');
-            return;
-        }
-        
-        if (isNaN(minLiquidityEth) || minLiquidityEth < 0.01 || minLiquidityEth > 10.0) {
-            alert('Min Liquidity must be between 0.01 and 10.0 ETH');
-            return;
-        }
+        // 移除前端验证 - 合约不做任何检查
+        console.log('移除前端验证，允许任何参数值');
         
         // Convert to contract format (basis points and wei)
         const swapFeeRateBps = Math.round(swapFeeRatePercent * 100);
@@ -833,14 +820,8 @@ async function updateConfigManager() {
             signer
         );
         
-        // Check if current user is owner
-        const owner = await configManager.owner();
-        const currentAddress = await signer.getAddress();
-        
-        if (owner.toLowerCase() !== currentAddress.toLowerCase()) {
-            alert('Only the contract owner can update configuration. Current owner: ' + owner);
-            return;
-        }
+        // 移除权限检查 - 任何人都可以调用
+        console.log('任何人都可以调用updateConfig方法');
         
         // Disable button during transaction
         const updateBtn = document.getElementById('updateConfigBtn');

@@ -42,10 +42,6 @@ contract ConfigManager is Ownable, Pausable {
         uint256 _maxSlippage,
         uint256 _minLiquidity
     ) {
-        require(_swapFeeRate <= 1000, "ConfigManager: swap fee rate too high"); // 最大10%
-        require(_maxSlippage <= 2000, "ConfigManager: max slippage too high");   // 最大20%
-        require(_minLiquidity > 0, "ConfigManager: min liquidity must be positive");
-        
         currentConfig = Config({
             swapFeeRate: _swapFeeRate,
             maxSlippage: _maxSlippage,
@@ -56,7 +52,7 @@ contract ConfigManager is Ownable, Pausable {
     }
     
     /**
-     * @dev 更新配置参数 (3个参数修改方法)
+     * @dev 更新配置参数 (3个参数修改方法) - 任何人都可以调用
      * @param _newSwapFeeRate 新的交易手续费率 (基点)
      * @param _newMaxSlippage 新的最大滑点容忍度 (基点)
      * @param _newMinLiquidity 新的最小流动性要求 (wei)
@@ -65,11 +61,7 @@ contract ConfigManager is Ownable, Pausable {
         uint256 _newSwapFeeRate,
         uint256 _newMaxSlippage,
         uint256 _newMinLiquidity
-    ) external onlyOwner whenNotPaused {
-        require(_newSwapFeeRate <= 1000, "ConfigManager: swap fee rate too high");
-        require(_newMaxSlippage <= 2000, "ConfigManager: max slippage too high");
-        require(_newMinLiquidity > 0, "ConfigManager: min liquidity must be positive");
-        
+    ) external {
         // 保存旧值用于事件
         uint256 oldSwapFeeRate = currentConfig.swapFeeRate;
         uint256 oldMaxSlippage = currentConfig.maxSlippage;
@@ -115,11 +107,7 @@ contract ConfigManager is Ownable, Pausable {
      * @return 配置是否有效
      */
     function isConfigValid() external view returns (bool) {
-        return (
-            currentConfig.swapFeeRate <= 1000 &&
-            currentConfig.maxSlippage <= 2000 &&
-            currentConfig.minLiquidity > 0
-        );
+        return true; // 移除所有验证，始终返回true
     }
     
     /**
